@@ -1,0 +1,104 @@
+---
+title: "Machine Learning Course Project"
+author: "Alexandra Kilmon"
+date: "12/27/2019"
+output: html_document
+---
+
+```{r setup, include = FALSE, warnings=FALSE, tidy = TRUE, tidy.opts=list(width.cutoff=60)}
+knitr::opts_chunk$set(echo = TRUE)
+library(tinytex)
+library(datasets)
+library(ggplot2)
+library(kableExtra)
+library(knitr)
+library(formatR) 
+library(caret)
+library(rattle)
+library(rpart)
+library(rpart.plot)
+library(RColorBrewer)
+library(rattle)
+library(randomForest)
+```
+
+## Introduction
+One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants will be analyzed to develop a machine learning algorithm to predict how well participants perform. 
+
+## Data Processing
+This data set includes records from 6 males aged between 20-28 years, with little weight lifting experience. The "classe" variable defines how a participant performed a repetition of the Unilateral Dumbbell Biceps Curl:
+
+
+- A: Exactly according to specification
+- B: Throwing the elbows to the front 
+- C: Lifting the dumbbell only halfway
+- D: Lowering the dumbbell only halfway
+- E: Throwing the hips to the front
+
+
+A training and testing data set was provided. Cross validation was used to subsample, without replacement, the training data set. 75% was used for the training set and 25% was used for the test data set. Once our model was fitted with the training data set, it was tested on the test data set pulled from the original training data set. Once further refinement was implemented, the model was tested on the original testing data set. 
+
+
+See the bar chart below to review a summary of the training data set. 
+```{r load data, echo = FALSE}
+rawdata <- read.csv("C:/Users/alk16/OneDrive/Desktop/datasciencecoursera/Machine-Learning-Course-Project/pml-training.csv", stringsAsFactors=TRUE)
+rawdata2 <- read.csv("C:/Users/alk16/OneDrive/Desktop/datasciencecoursera/Machine-Learning-Course-Project/pml-testing.csv", stringsAsFactors=TRUE)
+
+set.seed(123)
+
+#delete blank columns
+traindataset <- rawdata[,colSums(is.na(rawdata)) == 0]
+testdataset <- rawdata2[,colSums(is.na(rawdata)) == 0 ]
+
+#remove unneccesarry variables
+traindataset <- traindataset[,-c(1:7)]
+testdataset <- testdataset[,-c(1:7)]
+
+#remove columns with minimal variance
+NZV <- nearZeroVar(traindataset)
+traindataset <- traindataset[, -NZV]
+testdataset  <- testdataset[, -NZV]
+  
+#use cross validation to split original train data into train and test data 
+intrain <- createDataPartition(y=traindataset$classe,p=0.75,list=FALSE)
+training <- traindataset[intrain,]
+testing <- traindataset[-intrain,]
+```
+
+```{r summarize training data set, echo = FALSE}
+g = ggplot(training,aes(x=classe, fill = classe))
+g = g + geom_bar(stat = "count")
+g = g + labs(title = "Count of Classe Variable within Train Data Set",x="Classe",y="Frequency")
+g
+```
+
+
+## Prediction Model 1: Decision Trees
+```{r 1st prediction model}
+model1 <- rpart(classe ~ ., data=training, method="class")
+fancyRpartPlot(model1)
+
+model1predict <- predict(model1, testing, type = "class")
+model1confusmatrix <- confusionMatrix(model1predict, testing$classe)
+model1confusmatrix
+```
+
+
+## Prediction Model 2: Random Forests
+```{r 2nd prediction model}
+controlRF <- trainControl(method="cv", number=3, verboseIter=FALSE)
+model2 <- train(classe ~ ., data=training, method="rf", trControl=controlRF)
+model2$finalModel
+
+model2predict <- predict(model2, newdata=testing)
+model2confusmatrix <- confusionMatrix(model2predict, testing$classe)
+model2confusmatrix
+```
+
+
+## Conclusions
+It can be concluded that the random forests model performed better than the decision trees. The accuracy for the random forests and decisons trees were 73.8% and 99.5%, respectively. The expected out of sample error is 0.5%. The random forests model was used to predict the outcome level of the original test data (see below).
+```{r final prediction}
+finalprediction <- predict(model2,testdataset)
+finalprediction
+```
